@@ -1,2 +1,0 @@
-# net-spetra
-uid capstone
