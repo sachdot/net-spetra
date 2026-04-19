@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="NetSpectra live system dashboard — real-time CPU, memory, latency, IP intelligence, device detection, and browser geolocation.">
+    <title>NetSpectra | Live Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Intelligence grid */
+        .intel-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+        }
+        .intel-item {
+            display: flex; flex-direction: column; gap: 4px;
+            padding: 14px 16px; border-radius: 10px;
+            background: rgba(6,182,212,0.04); border: 1px solid rgba(6,182,212,0.1);
+            transition: border-color 0.25s;
+        }
+        .intel-item:hover { border-color: rgba(6,182,212,0.25); }
+        .intel-label {
+            font-size: 0.64rem; font-weight: 700; letter-spacing: 1px;
+            text-transform: uppercase; color: var(--text-tertiary);
+        }
+        .intel-value {
+            font-family: var(--font-mono); font-size: 0.88rem;
+            color: var(--text-primary); font-weight: 500; word-break: break-all;
+        }
+        .intel-value.detecting {
+            color: var(--text-tertiary); animation: textPulse 1.5s infinite;
+        }
+        .intel-item.span-2 { grid-column: span 2; }
+
+        /* Confidence badge */
+        .confidence-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-size: 0.7rem; font-weight: 700; padding: 3px 10px;
+            border-radius: 20px; letter-spacing: 0.3px;
+        }
+        .confidence-badge.high   { color: var(--status-success); background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); }
+        .confidence-badge.medium { color: var(--status-warning); background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); }
+        .confidence-badge.low    { color: var(--status-error);   background: rgba(239,68,68,0.1);  border: 1px solid rgba(239,68,68,0.2); }
+
+        /* Source tags */
+        .source-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+        .source-tag {
+            font-size: 0.66rem; color: var(--text-tertiary);
+            border: 1px solid var(--border-subtle); padding: 2px 8px;
+            border-radius: 4px; font-family: var(--font-mono);
+        }
+        .source-tag.active { color: var(--accent-primary); border-color: rgba(6,182,212,0.25); }
+
+        /* Device info grid */
+        .device-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .device-item {
+            padding: 12px 14px; border-radius: 8px;
+            background: rgba(139,92,246,0.04); border: 1px solid rgba(139,92,246,0.1);
+            display: flex; flex-direction: column; gap: 3px;
+        }
+        .device-label {
+            font-size: 0.64rem; font-weight: 700; letter-spacing: 1px;
+            text-transform: uppercase; color: var(--text-tertiary);
+        }
+        .device-value {
+            font-size: 0.85rem; color: var(--text-primary); font-weight: 500;
+        }
+
+        /* GPS permission button */
+        .gps-btn {
+            margin-top: 12px; width: 100%; border-radius: 8px;
+            font-size: 0.82rem; min-height: 40px; gap: 6px;
+        }
+
+        @media (max-width: 768px)  { .intel-grid { grid-template-columns: 1fr 1fr; } .device-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 480px)  { .intel-grid { grid-template-columns: 1fr; }   .intel-item.span-2 { grid-column: span 1; } }
+    </style>
+</head>
+<body>
+<div class="app-shell">
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar" aria-label="Main navigation">
+        <div class="sidebar-header">
+            <a href="index.html" class="sidebar-logo" aria-label="NetSpectra Home">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span>NetSpectra</span>
+            </a>
+        </div>
+        <nav class="sidebar-nav" aria-label="Primary navigation">
+            <a href="index.html">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                Overview
+            </a>
+            <a href="dashboard.html" class="active" aria-current="page">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="3" height="9"/><rect x="14" y="7" width="3" height="5"/></svg>
+                Dashboard
+            </a>
+            <a href="analyzer.html">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                Analyzer
+            </a>
+            <a href="performance.html">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Performance
+            </a>
+            <a href="about.html">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                System Admin
+            </a>
+            <a href="login.html" class="logout-link" id="logout-btn" style="margin-top:auto;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Sign Out
+            </a>
+        </nav>
+        <div class="sidebar-footer"><span>v2.0.0 — Enterprise</span></div>
+    </aside>
+    <div class="sidebar-overlay" aria-hidden="true"></div>
+
+    <!-- ===== MAIN ===== -->
+    <main class="main-content">
+        <header class="top-header">
+            <div class="header-left">
+                <button class="mobile-nav-toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidebar">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+                <div class="breadcrumb">System / <span>Live Dashboard</span></div>
+            </div>
+            <div class="header-right">
+                <div class="connection-status" id="conn-status" aria-live="polite">
+                    <span class="connection-dot disconnected" id="conn-dot"></span>
+                    <span id="conn-text">Connecting…</span>
+                </div>
+                <span class="caps-label" style="margin-left:10px;">UPTIME: <span id="uptime-display" class="color-accent">--</span></span>
+                <div class="header-user" role="button" tabindex="0" aria-label="User profile">
+                    <div class="avatar-initials" aria-hidden="true">AD</div>
+                    <span class="header-user-name">Admin</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="dashboard-container animate-fade-up">
+            <div class="page-header">
+                <h1 class="page-title">System Intelligence Dashboard</h1>
+                <p class="page-subtitle">Multi-source IP intelligence, real-time OS metrics, browser geolocation, and device fingerprinting.</p>
+            </div>
+
+            <div class="card-grid">
+                <!-- CPU -->
+                <div class="card col-span-4">
+                    <div class="card-body" style="min-height:140px;">
+                        <span class="metric-label">CPU Utilization</span>
+                        <div class="metric-value" id="cpu-val">0%</div>
+                        <div class="progress-track"><div class="progress-fill" id="cpu-bar" style="width:0%"></div></div>
+                    </div>
+                </div>
+
+                <!-- Memory -->
+                <div class="card col-span-4">
+                    <div class="card-body" style="min-height:140px;">
+                        <span class="metric-label">Memory Usage</span>
+                        <div class="metric-value" id="mem-val">0 <small>GB</small></div>
+                        <div class="progress-track"><div class="progress-fill purple" id="mem-bar" style="width:0%"></div></div>
+                    </div>
+                </div>
+
+                <!-- Latency -->
+                <div class="card col-span-4">
+                    <div class="card-body" style="min-height:140px;">
+                        <span class="metric-label">Network Latency</span>
+                        <div class="metric-value" id="ping-val">-- <small>ms</small></div>
+                        <div style="margin-top:14px;"><span class="status-badge online" id="conn-badge">STABLE</span></div>
+                    </div>
+                </div>
+
+                <!-- ===== NETWORK INTELLIGENCE (Multi-Source) ===== -->
+                <div class="card col-span-12">
+                    <div class="card-header">
+                        <h2 class="card-title">🌐 Network Intelligence</h2>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span class="confidence-badge low" id="intel-confidence">Detecting…</span>
+                            <button onclick="refreshIntel()" style="padding:4px 12px;font-size:0.72rem;min-height:auto;" aria-label="Refresh intelligence">
+                                ↻ Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="intel-grid" id="intel-grid">
+                            <div class="intel-item"><span class="intel-label">Public IP Address</span><span class="intel-value detecting" id="intel-ip">Querying sources…</span></div>
+                            <div class="intel-item"><span class="intel-label">Network Provider (ISP)</span><span class="intel-value detecting" id="intel-isp">Querying sources…</span></div>
+                            <div class="intel-item"><span class="intel-label">Organization</span><span class="intel-value detecting" id="intel-org">Querying sources…</span></div>
+                            <div class="intel-item"><span class="intel-label">City</span><span class="intel-value detecting" id="intel-city">Querying sources…</span></div>
+                            <div class="intel-item"><span class="intel-label">Region / State</span><span class="intel-value detecting" id="intel-region">Querying sources…</span></div>
+                            <div class="intel-item"><span class="intel-label">Country</span><span class="intel-value detecting" id="intel-country">Querying sources…</span></div>
+                            <div class="intel-item"><span class="intel-label">Coordinates (IP-based)</span><span class="intel-value detecting" id="intel-coords">Querying sources…</span></div>
+                            <div class="intel-item"><span class="intel-label">Timezone</span><span class="intel-value detecting" id="intel-tz">Querying sources…</span></div>
+                            <div class="intel-item"><span class="intel-label">ASN</span><span class="intel-value detecting" id="intel-asn">Querying sources…</span></div>
+                            <div class="intel-item"><span class="intel-label">Proxy / VPN</span><span class="intel-value detecting" id="intel-proxy">—</span></div>
+                            <div class="intel-item"><span class="intel-label">Hosting / Datacenter</span><span class="intel-value detecting" id="intel-hosting">—</span></div>
+                            <div class="intel-item"><span class="intel-label">Mobile Network</span><span class="intel-value detecting" id="intel-mobile">—</span></div>
+                        </div>
+                        <!-- Source attribution -->
+                        <div class="source-tags" id="source-tags">
+                            <span class="source-tag">ip-api.com</span>
+                            <span class="source-tag">ipwho.is</span>
+                            <span class="source-tag">ipapi.co</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== BROWSER GEOLOCATION ===== -->
+                <div class="card col-span-6">
+                    <div class="card-header">
+                        <h2 class="card-title">📍 Browser Geolocation</h2>
+                        <span class="caps-label" id="geo-status" style="color: var(--text-tertiary);">Pending Permission</span>
+                    </div>
+                    <div class="card-body">
+                        <p style="font-size:0.84rem; color:var(--text-secondary); margin-bottom:14px; line-height:1.6;">
+                            GPS location is <strong>more accurate</strong> than IP-based detection.
+                            Grant permission for precise coordinates (requires HTTPS or localhost).
+                        </p>
+                        <div class="intel-grid" style="grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div class="intel-item"><span class="intel-label">Latitude</span><span class="intel-value" id="gps-lat">—</span></div>
+                            <div class="intel-item"><span class="intel-label">Longitude</span><span class="intel-value" id="gps-lon">—</span></div>
+                            <div class="intel-item"><span class="intel-label">Accuracy</span><span class="intel-value" id="gps-accuracy">—</span></div>
+                            <div class="intel-item"><span class="intel-label">Altitude</span><span class="intel-value" id="gps-alt">—</span></div>
+                        </div>
+                        <button class="btn-primary gps-btn" id="gps-btn" onclick="requestGPS()" aria-label="Allow browser geolocation">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                            Enable Precise Location
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ===== CLIENT DEVICE DETECTION ===== -->
+                <div class="card col-span-6">
+                    <div class="card-header">
+                        <h2 class="card-title">🖥️ Client Environment</h2>
+                        <span class="caps-label" style="color:var(--accent-secondary);">Browser APIs</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="device-grid">
+                            <div class="device-item"><span class="device-label">Device Type</span><span class="device-value" id="dev-type">Detecting…</span></div>
+                            <div class="device-item"><span class="device-label">Browser</span><span class="device-value" id="dev-browser">Detecting…</span></div>
+                            <div class="device-item"><span class="device-label">Operating System</span><span class="device-value" id="dev-os">Detecting…</span></div>
+                            <div class="device-item"><span class="device-label">Connection Type</span><span class="device-value" id="dev-conn">Detecting…</span></div>
+                            <div class="device-item"><span class="device-label">Screen Resolution</span><span class="device-value" id="dev-screen">Detecting…</span></div>
+                            <div class="device-item"><span class="device-label">Language</span><span class="device-value" id="dev-lang">Detecting…</span></div>
+                            <div class="device-item"><span class="device-label">Effective Bandwidth</span><span class="device-value" id="dev-bandwidth">—</span></div>
+                            <div class="device-item"><span class="device-label">Round-Trip Time</span><span class="device-value" id="dev-rtt">—</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Throughput Chart -->
+                <div class="card col-span-8">
+                    <div class="card-header">
+                        <h2 class="card-title">CPU Throughput Stream</h2>
+                        <button onclick="location.reload()" style="padding:4px 12px; font-size:0.75rem; min-height:auto;" aria-label="Reset chart">Reset</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container canvas-wrapper" style="height:280px;">
+                            <canvas id="trafficChart" aria-label="CPU usage over time"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Topology Map -->
+                <div class="card col-span-4">
+                    <div class="card-header">
+                        <h2 class="card-title">Node Topology</h2>
+                        <span class="caps-label color-accent">ACTIVE</span>
+                    </div>
+                    <div class="card-body" style="padding:0;">
+                        <div class="map-container" style="height:280px;">
+                            <canvas id="networkMap" aria-label="Network node topology animation"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="app.js"></script>
+<script>
+    // ============================================================
+    // 1. MULTI-SOURCE NETWORK INTELLIGENCE (backend)
+    // ============================================================
+    function setIntelValue(id, val, fallback) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const display = val || fallback || "—";
+        el.textContent = display;
+        el.classList.remove("detecting");
+    }
+
+    async function loadNetworkIntelligence() {
+        // Set all to detecting state
+        document.querySelectorAll(".intel-value").forEach(el => {
+            el.textContent = "Querying sources…";
+            el.classList.add("detecting");
+        });
+
+        try {
+            const res  = await fetch("/network-info");
+            const data = await res.json();
+
+            setIntelValue("intel-ip",      data.ip);
+            setIntelValue("intel-isp",     data.provider);
+            setIntelValue("intel-org",     data.org);
+            setIntelValue("intel-city",    data.city);
+            setIntelValue("intel-region",  data.region);
+            setIntelValue("intel-country", data.country + (data.countryCode !== "--" ? ` (${data.countryCode})` : ""));
+            setIntelValue("intel-coords",  (data.lat != null && data.lon != null) ? `${data.lat}, ${data.lon}` : null);
+            setIntelValue("intel-tz",      data.timezone);
+            setIntelValue("intel-asn",     data.asn);
+            setIntelValue("intel-proxy",   data.proxy ? "⚠ Yes – VPN/Proxy detected" : "✓ No proxy detected");
+            setIntelValue("intel-hosting", data.hosting ? "⚠ Datacenter/Hosting IP" : "✓ Residential IP");
+            setIntelValue("intel-mobile",  data.mobile  ? "📱 Mobile carrier" : "🖥 Non-mobile");
+
+            // Confidence badge
+            const badge = document.getElementById("intel-confidence");
+            if (badge && data.confidence) {
+                badge.className = `confidence-badge ${data.confidence}`;
+                const labels = { high: "HIGH — 3 sources agree", medium: "MEDIUM — 2 sources", low: "LOW — 1 source", none: "OFFLINE" };
+                badge.textContent = labels[data.confidence] || data.confidence;
+            }
+
+            // Source tags
+            const tagsEl = document.getElementById("source-tags");
+            if (tagsEl && data.sources) {
+                tagsEl.innerHTML = ["ip-api.com", "ipwho.is", "ipapi.co"]
+                    .map(s => `<span class="source-tag ${data.sources.includes(s) ? "active" : ""}">${data.sources.includes(s) ? "✓ " : "✗ "}${s}</span>`)
+                    .join("");
+            }
+
+        } catch (err) {
+            console.error("Intelligence fetch failed:", err);
+            document.querySelectorAll(".intel-value").forEach(el => {
+                el.textContent = "Detection failed";
+                el.classList.remove("detecting");
+            });
+        }
+    }
+
+    function refreshIntel() { loadNetworkIntelligence(); }
+    loadNetworkIntelligence();
+
+    // ============================================================
+    // 2. BROWSER GEOLOCATION (GPS — more accurate than IP)
+    // ============================================================
+    function requestGPS() {
+        const statusEl = document.getElementById("geo-status");
+        const btn      = document.getElementById("gps-btn");
+
+        if (!navigator.geolocation) {
+            statusEl.textContent = "Not Supported";
+            statusEl.style.color = "var(--status-error)";
+            btn.textContent = "Geolocation not available in this browser";
+            btn.disabled = true;
+            return;
+        }
+
+        statusEl.textContent = "Requesting…";
+        statusEl.style.color = "var(--accent-primary)";
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner" style="border-color:rgba(255,255,255,0.3);border-top-color:#fff;width:14px;height:14px;"></span> Waiting for permission…`;
+
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                document.getElementById("gps-lat").textContent = pos.coords.latitude.toFixed(6);
+                document.getElementById("gps-lon").textContent = pos.coords.longitude.toFixed(6);
+                document.getElementById("gps-accuracy").textContent = `±${Math.round(pos.coords.accuracy)} meters`;
+                document.getElementById("gps-alt").textContent = pos.coords.altitude != null
+                    ? `${pos.coords.altitude.toFixed(1)} m` : "Not available";
+                statusEl.textContent = "✓ Granted — High Accuracy";
+                statusEl.style.color = "var(--status-success)";
+                btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> Location Acquired`;
+                btn.disabled = false;
+            },
+            (err) => {
+                const msgs = {
+                    1: "Permission denied by user",
+                    2: "Position unavailable",
+                    3: "Request timed out"
+                };
+                statusEl.textContent = "✗ " + (msgs[err.code] || "Failed");
+                statusEl.style.color = "var(--status-error)";
+                btn.disabled = false;
+                btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> Retry Location`;
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+        );
+    }
+
+    // ============================================================
+    // 3. CLIENT DEVICE DETECTION (Browser APIs)
+    // ============================================================
+    function detectClientEnvironment() {
+        const ua = navigator.userAgent;
+
+        // --- Device Type ---
+        const isMobile  = /Mobi|Android/i.test(ua);
+        const isTablet  = /Tablet|iPad/i.test(ua) || (isMobile && Math.min(screen.width, screen.height) > 600);
+        const deviceType = isTablet ? "📱 Tablet" : isMobile ? "📱 Mobile" : "🖥️ Desktop";
+        document.getElementById("dev-type").textContent = deviceType;
+
+        // --- Browser ---
+        let browser = "Unknown";
+        if (ua.includes("Edg/"))        browser = "Microsoft Edge";
+        else if (ua.includes("OPR/") || ua.includes("Opera"))  browser = "Opera";
+        else if (ua.includes("Chrome/") && !ua.includes("Edg")) browser = "Google Chrome";
+        else if (ua.includes("Safari/") && !ua.includes("Chrome")) browser = "Safari";
+        else if (ua.includes("Firefox/")) browser = "Firefox";
+        // Add version
+        const verMatch = ua.match(/(Edg|OPR|Chrome|Safari|Firefox)\/(\d+(\.\d+)?)/);
+        if (verMatch) browser += ` v${verMatch[2]}`;
+        document.getElementById("dev-browser").textContent = browser;
+
+        // --- Operating System ---
+        let osName = "Unknown";
+        if (ua.includes("Windows NT 10"))     osName = "Windows 10/11";
+        else if (ua.includes("Windows NT 6.3")) osName = "Windows 8.1";
+        else if (ua.includes("Windows NT 6.1")) osName = "Windows 7";
+        else if (/Mac OS X/.test(ua))           osName = "macOS";
+        else if (/Android (\d+)/.test(ua))      osName = `Android ${ua.match(/Android (\d+(\.\d+)?)/)[1]}`;
+        else if (/iPhone|iPad/.test(ua))        osName = "iOS";
+        else if (/Linux/.test(ua))              osName = "Linux";
+        else if (/CrOS/.test(ua))               osName = "Chrome OS";
+        document.getElementById("dev-os").textContent = osName;
+
+        // --- Connection Type (Network Information API) ---
+        const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (conn) {
+            const connMap = {
+                "wifi": "📶 WiFi",
+                "cellular": "📡 Cellular (Mobile Data)",
+                "ethernet": "🔌 Ethernet",
+                "bluetooth": "🅱️ Bluetooth",
+                "none": "❌ Offline",
+                "other": "🔗 Other",
+                "unknown": "🔗 Unknown"
+            };
+            const connType = connMap[conn.type] || connMap[conn.effectiveType] || conn.effectiveType || "Unknown";
+            document.getElementById("dev-conn").textContent = connType;
+
+            // Effective bandwidth
+            if (conn.downlink != null) {
+                document.getElementById("dev-bandwidth").textContent = `${conn.downlink} Mbps (effective)`;
+            }
+            // RTT
+            if (conn.rtt != null) {
+                document.getElementById("dev-rtt").textContent = `${conn.rtt} ms`;
+            }
+
+            // Listen for connection changes
+            conn.addEventListener("change", () => {
+                const newType = connMap[conn.type] || connMap[conn.effectiveType] || conn.effectiveType || "Unknown";
+                document.getElementById("dev-conn").textContent = newType;
+                if (conn.downlink != null) document.getElementById("dev-bandwidth").textContent = `${conn.downlink} Mbps`;
+                if (conn.rtt != null) document.getElementById("dev-rtt").textContent = `${conn.rtt} ms`;
+            });
+        } else {
+            document.getElementById("dev-conn").textContent = "API not supported";
+            document.getElementById("dev-bandwidth").textContent = "—";
+            document.getElementById("dev-rtt").textContent = "—";
+        }
+
+        // --- Screen Resolution ---
+        const dpr = window.devicePixelRatio || 1;
+        document.getElementById("dev-screen").textContent = `${screen.width}×${screen.height} @${dpr.toFixed(1)}x`;
+
+        // --- Language ---
+        document.getElementById("dev-lang").textContent = navigator.language || navigator.languages?.[0] || "Unknown";
+    }
+
+    detectClientEnvironment();
+
+    // ============================================================
+    // 4. SOCKET.IO — real-time OS metrics
+    // ============================================================
+    const connDot  = document.getElementById("conn-dot");
+    const connText = document.getElementById("conn-text");
+
+    try {
+        const socket = io({ reconnectionAttempts: 5, timeout: 5000 });
+
+        socket.on("connect", () => {
+            connDot.classList.remove("disconnected");
+            connText.textContent = "Connected";
+        });
+        socket.on("disconnect", () => {
+            connDot.classList.add("disconnected");
+            connText.textContent = "Disconnected";
+        });
+        socket.on("connect_error", () => {
+            connDot.classList.add("disconnected");
+            connText.textContent = "Server Offline";
+        });
+        socket.on("systemUpdate", (sys) => {
+            document.getElementById("cpu-val").textContent  = sys.cpuPercent + "%";
+            document.getElementById("cpu-bar").style.width = sys.cpuPercent + "%";
+            document.getElementById("mem-val").innerHTML   = `${sys.memory.used}<small>GB / ${sys.memory.total}GB</small>`;
+            document.getElementById("mem-bar").style.width = sys.memory.percent + "%";
+            document.getElementById("ping-val").innerHTML  = `${sys.ping}<small>ms</small>`;
+            document.getElementById("uptime-display").textContent = sys.uptime;
+            pushChart(sys.cpuPercent);
+        });
+    } catch (e) {
+        connDot.classList.add("disconnected");
+        connText.textContent = "No Server";
+        setInterval(() => pushChart(Math.floor(Math.random() * 20 + 10)), 2500);
+    }
+
+    // ============================================================
+    // 5. CPU CHART
+    // ============================================================
+    const tCtx = document.getElementById("trafficChart").getContext("2d");
+    const trafficChart = new Chart(tCtx, {
+        type: "line",
+        data: {
+            labels: [],
+            datasets: [{ label:"CPU %", borderColor:"#06b6d4", borderWidth:2, pointRadius:0,
+                data:[], fill:true, backgroundColor:"rgba(6,182,212,0.07)", tension:0.4 }]
+        },
+        options: {
+            responsive:true, maintainAspectRatio:false,
+            scales: {
+                x: { display:false },
+                y: { grid:{color:"rgba(255,255,255,0.03)"}, ticks:{color:"rgba(255,255,255,0.2)", font:{size:10}, maxTicksLimit:5} }
+            },
+            plugins:{legend:{display:false}}
+        }
+    });
+
+    function pushChart(val) {
+        const now = new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+        trafficChart.data.labels.push(now);
+        trafficChart.data.datasets[0].data.push(val);
+        if (trafficChart.data.labels.length > 30) {
+            trafficChart.data.labels.shift();
+            trafficChart.data.datasets[0].data.shift();
+        }
+        trafficChart.update("none");
+    }
+
+    // ============================================================
+    // 6. TOPOLOGY ANIMATION
+    // ============================================================
+    const mapCanvas = document.getElementById("networkMap");
+    const mctx      = mapCanvas.getContext("2d");
+    const nodes = [
+        {x:0.1,y:0.5,label:"Edge", color:"#64748b"},
+        {x:0.3,y:0.3,label:"ISP",  color:"#6366f1"},
+        {x:0.3,y:0.7,label:"CDN",  color:"#38bdf8"},
+        {x:0.6,y:0.5,label:"Core", color:"#06b6d4"},
+        {x:0.9,y:0.5,label:"DC",   color:"#10b981"}
+    ];
+    let particles = [];
+
+    function drawMap() {
+        const w = mapCanvas.width  = mapCanvas.offsetWidth;
+        const h = mapCanvas.height = mapCanvas.offsetHeight;
+        mctx.clearRect(0, 0, w, h);
+
+        mctx.strokeStyle = "rgba(148,163,184,0.07)"; mctx.lineWidth = 1;
+        nodes.forEach((n,i) => nodes.slice(i+1).forEach(t => {
+            mctx.beginPath(); mctx.moveTo(n.x*w,n.y*h); mctx.lineTo(t.x*w,t.y*h); mctx.stroke();
+        }));
+
+        particles.forEach((p,idx) => {
+            p.progress += p.speed;
+            if (p.progress >= 1) { particles.splice(idx,1); return; }
+            const cx = p.start.x*w + (p.end.x-p.start.x)*w*p.progress;
+            const cy = p.start.y*h + (p.end.y-p.start.y)*h*p.progress;
+            mctx.fillStyle = "rgba(6,182,212,0.6)";
+            mctx.shadowBlur = 8; mctx.shadowColor = "#06b6d4";
+            mctx.beginPath(); mctx.arc(cx,cy,2,0,Math.PI*2); mctx.fill();
+            mctx.shadowBlur = 0;
+        });
+
+        nodes.forEach(n => {
+            const x = n.x*w, y = n.y*h, pulse = Math.sin(Date.now()/400)*3;
+            mctx.fillStyle = n.color;
+            mctx.beginPath(); mctx.arc(x,y,5+pulse,0,Math.PI*2); mctx.fill();
+            mctx.fillStyle = "#8b949e";
+            mctx.font = "bold 10px Inter,sans-serif"; mctx.textAlign = "center";
+            mctx.fillText(n.label.toUpperCase(), x, y+22);
+        });
+
+        if (Math.random() < 0.08) {
+            const i = Math.floor(Math.random()*(nodes.length-1));
+            particles.push({start:nodes[i],end:nodes[i+1],progress:0,speed:0.005+Math.random()*0.01});
+        }
+        requestAnimationFrame(drawMap);
+    }
+    drawMap();
+</script>
+</body>
+</html>
